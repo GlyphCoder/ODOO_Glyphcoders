@@ -13,7 +13,7 @@ body{font-family:Arial,sans-serif;font-size:14px;color:#333}
 .header{background:#0e1311;color:#fff;padding:28px 40px;display:flex;justify-content:space-between;align-items:flex-end}
 .logo{font-size:22px;font-weight:700;letter-spacing:-0.5px}
 .invoice-label{font-size:32px;font-weight:800;letter-spacing:-1.5px}
-.meta{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:28px 40px;background:#fff;border-bottom:1px solid #f0f0f0}
+.meta{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:20px;padding:28px 40px;background:#fff;border-bottom:1px solid #f0f0f0}
 .meta-block{padding:0}
 .meta-label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:6px}
 .meta-value{font-weight:600;color:#0e1311;margin-bottom:4px}
@@ -43,7 +43,12 @@ table tr:last-child td{border-bottom:none}
 
 <div class="meta">
   <div class="meta-block">
-    <div class="meta-label">Bill To</div>
+    <div class="meta-label">From Procurement Officer</div>
+    <div class="meta-value">${d.profiles?.full_name || 'Procurement Officer'}</div>
+    <div class="meta-sub">Your Organisation<br/>VendorBridge ERP</div>
+  </div>
+  <div class="meta-block">
+    <div class="meta-label">Bill To (Vendor)</div>
     <div class="meta-value">${d.vendor?.company_name || ''}</div>
     <div class="meta-sub">${d.vendor?.address || ''}, ${d.vendor?.city || ''}<br/>GST: ${d.vendor?.gst_number || 'N/A'}</div>
   </div>

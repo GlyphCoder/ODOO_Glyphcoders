@@ -17,6 +17,7 @@ import RFQs from './pages/RFQs';
 import RFQCreate from './pages/RFQCreate';
 import RFQDetail from './pages/RFQDetail';
 import Quotations from './pages/Quotations';
+import QuotationDetail from './pages/QuotationDetail';
 import QuotationSubmit from './pages/QuotationSubmit';
 import QuotationCompare from './pages/QuotationCompare';
 import Approvals from './pages/Approvals';
@@ -27,16 +28,20 @@ import Invoices from './pages/Invoices';
 import InvoiceDetail from './pages/InvoiceDetail';
 import Reports from './pages/Reports';
 import ActivityLogs from './pages/ActivityLogs';
+import LandingPage from './pages/LandingPage';
 
 // Route guards
-import { ProtectedRoute } from './routes/ProtectedRoute';
-import LandingPage from './pages/LandingPage';
+import { ProtectedRoute, RoleRoute } from './routes/ProtectedRoute';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 30_000, retry: 1 },
   },
 });
+
+const internalRoles = ['admin', 'manager', 'procurement_officer'];
+const approvalRoles = ['admin', 'manager'];
+const logRoles = ['admin', 'manager'];
 
 function AppAuthInitializer() {
   const { initialize, setSession, setUser } = useAuthStore();
@@ -92,20 +97,21 @@ export default function App() {
 
           {/* Protected */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
+          <Route path="/vendors" element={<ProtectedRoute><RoleRoute allowedRoles={internalRoles}><Vendors /></RoleRoute></ProtectedRoute>} />
           <Route path="/rfqs" element={<ProtectedRoute><RFQs /></ProtectedRoute>} />
-          <Route path="/rfqs/new" element={<ProtectedRoute><RFQCreate /></ProtectedRoute>} />
+          <Route path="/rfqs/new" element={<ProtectedRoute><RoleRoute allowedRoles={internalRoles}><RFQCreate /></RoleRoute></ProtectedRoute>} />
           <Route path="/rfqs/:id" element={<ProtectedRoute><RFQDetail /></ProtectedRoute>} />
-          <Route path="/rfqs/:rfq_id/compare" element={<ProtectedRoute><QuotationCompare /></ProtectedRoute>} />
+          <Route path="/rfqs/:rfq_id/compare" element={<ProtectedRoute><RoleRoute allowedRoles={internalRoles}><QuotationCompare /></RoleRoute></ProtectedRoute>} />
           <Route path="/quotations" element={<ProtectedRoute><Quotations /></ProtectedRoute>} />
-          <Route path="/approvals" element={<ProtectedRoute><Approvals /></ProtectedRoute>} />
-          <Route path="/approvals/:id" element={<ProtectedRoute><ApprovalDetail /></ProtectedRoute>} />
+          <Route path="/quotations/:id" element={<ProtectedRoute><QuotationDetail /></ProtectedRoute>} />
+          <Route path="/approvals" element={<ProtectedRoute><RoleRoute allowedRoles={approvalRoles}><Approvals /></RoleRoute></ProtectedRoute>} />
+          <Route path="/approvals/:id" element={<ProtectedRoute><RoleRoute allowedRoles={internalRoles}><ApprovalDetail /></RoleRoute></ProtectedRoute>} />
           <Route path="/purchase-orders" element={<ProtectedRoute><PurchaseOrders /></ProtectedRoute>} />
           <Route path="/purchase-orders/:id" element={<ProtectedRoute><PODetail /></ProtectedRoute>} />
           <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
           <Route path="/invoices/:id" element={<ProtectedRoute><InvoiceDetail /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/activity-logs" element={<ProtectedRoute><ActivityLogs /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><RoleRoute allowedRoles={internalRoles}><Reports /></RoleRoute></ProtectedRoute>} />
+          <Route path="/activity-logs" element={<ProtectedRoute><RoleRoute allowedRoles={logRoles}><ActivityLogs /></RoleRoute></ProtectedRoute>} />
 
           {/* Catch all */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

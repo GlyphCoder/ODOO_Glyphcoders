@@ -1,24 +1,33 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Send, BarChart2, Loader2, X, CheckCircle2, ShoppingCart, Receipt } from 'lucide-react';
+import {
+  MessageSquare, Send, BarChart2, Loader2, X, CheckCircle2, ShoppingCart, Receipt, Eye, Undo2
+} from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
+import { useAuthStore } from '../store/authStore';
 import { useRBAC } from '../hooks/useRBAC';
 import { formatDate, formatCurrency, getStatusBadgeClass, getStatusLabel } from '../lib/utils';
 import api from '../lib/api';
 import { toast } from 'sonner';
 
-const statusTabs = ['All', 'submitted', 'under_review', 'accepted', 'rejected'];
+const internalStatusTabs = ['All', 'submitted', 'under_review', 'accepted', 'rejected'];
+const vendorStatusTabs = ['All', 'submitted', 'under_review', 'accepted', 'rejected', 'withdrawn'];
 
 export default function Quotations() {
-  const { can, role } = useRBAC();
+  const { can } = useRBAC();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState('All');
   const [modalQuot, setModalQuot] = useState(null);
   const [selectedManagerId, setSelectedManagerId] = useState('');
 
+  const isVendor = user?.role === 'vendor';
+  const statusTabs = isVendor ? vendorStatusTabs : internalStatusTabs;
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['quotations', tab],
+    queryKey: ['quotations', tab, user?.role],
     queryFn: () => {
       const p = new URLSearchParams();
       if (tab !== 'All') p.set('status', tab);
@@ -44,6 +53,17 @@ export default function Quotations() {
     },
     onError: (e) => toast.error(e.response?.data?.error || e.message),
   });
+
+  const withdrawMutation = useMutation({
+    mutationFn: (quotationId) => api.post(`/quotations/${quotationId}/withdraw`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotations'] });
+      toast.success('Quotation withdrawn');
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const canWithdraw = (quotation) => isVendor && !['accepted', 'rejected', 'withdrawn'].includes(quotation.status);
 
   const handleSendForApproval = (quot) => {
     setModalQuot(quot);
@@ -108,72 +128,110 @@ export default function Quotations() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>RFQ</th>
-                    <th>Title</th>
-                    <th>Vendor</th>
-                    <th>Submitted</th>
-                    <th>Total Amount</th>
-                    <th>Delivery</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    {isVendor ? (
+                      <>
+                        <th>Quotation</th>
+                        <th>Submitted</th>
+                        <th>Total Amount</th>
+                        <th>Delivery</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>RFQ</th>
+                        <th>Title</th>
+                        <th>Vendor</th>
+                        <th>Submitted</th>
+                        <th>Total Amount</th>
+                        <th>Delivery</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {data.map(q => (
                     <tr key={q.id}>
-                      <td className="font-schibsted font-semibold">{q.rfqs?.rfq_number || '—'}</td>
-                      <td className="font-medium">{q.rfqs?.title || '—'}</td>
-                      <td>{q.vendors?.company_name || '—'}</td>
+                      {isVendor ? (
+                        <td className="font-schibsted font-semibold">QTN-{q.id.slice(0, 8).toUpperCase()}</td>
+                      ) : (
+                        <>
+                          <td className="font-schibsted font-semibold">{q.rfqs?.rfq_number || '—'}</td>
+                          <td className="font-medium">{q.rfqs?.title || '—'}</td>
+                          <td>{q.vendors?.company_name || '—'}</td>
+                        </>
+                      )}
                       <td className="text-gray-500 text-xs">{formatDate(q.submitted_at)}</td>
                       <td className="font-noto font-semibold">{formatCurrency(q.total_amount)}</td>
                       <td className="font-noto">{q.delivery_days}d</td>
                       <td><span className={`badge ${getStatusBadgeClass(q.status)}`}>{getStatusLabel(q.status)}</span></td>
                       <td>
-                        <div className="flex items-center gap-2">
-                          {/* View RFQ */}
-                          {q.rfqs?.id && (
+                        {isVendor ? (
+                          <div className="flex flex-wrap gap-2">
                             <button
-                              onClick={() => navigate(`/rfqs/${q.rfqs.id}`)}
-                              className="text-xs btn-outline py-1.5 px-3"
+                              onClick={() => navigate(`/quotations/${q.id}`)}
+                              className="text-xs btn-outline py-1.5 px-3 inline-flex items-center gap-1.5"
                             >
-                              View RFQ
+                              <Eye size={13} />
+                              View Quotation
                             </button>
-                          )}
+                            <button
+                              onClick={() => withdrawMutation.mutate(q.id)}
+                              disabled={!canWithdraw(q) || withdrawMutation.isPending}
+                              className="text-xs btn-outline py-1.5 px-3 inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Undo2 size={13} />
+                              Withdraw Quotation
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {/* View Quotation (Officer / internal) */}
+                            <button
+                              onClick={() => navigate(`/quotations/${q.id}`)}
+                              className="text-xs btn-outline py-1.5 px-3 inline-flex items-center gap-1.5"
+                            >
+                              <Eye size={13} />
+                              View Quotation
+                            </button>
 
-                          {/* Officer: Compare button if RFQ has quotations */}
-                          {can('compareQuotations') && q.rfqs?.id && (
-                            <button
-                              onClick={() => navigate(`/rfqs/${q.rfqs.id}/compare`)}
-                              className="text-xs btn-outline py-1.5 px-3"
-                              title="Compare all quotations for this RFQ"
-                            >
-                              <BarChart2 size={12} />
-                            </button>
-                          )}
+                            {/* Officer: Compare button if RFQ has quotations */}
+                            {can('compareQuotations') && q.rfqs?.id && (
+                              <button
+                                onClick={() => navigate(`/rfqs/${q.rfqs.id}/compare`)}
+                                className="text-xs btn-outline py-1.5 px-3"
+                                title="Compare all quotations for this RFQ"
+                              >
+                                <BarChart2 size={12} />
+                              </button>
+                            )}
 
-                          {/* Officer: Send for Approval if submitted */}
-                          {can('compareQuotations') && q.status === 'submitted' && (
-                            <button
-                              onClick={() => handleSendForApproval(q)}
-                              className="text-xs btn-primary py-1.5 px-3"
-                              title="Send this quotation for manager approval"
-                            >
-                              <Send size={12} />
-                              Send
-                            </button>
-                          )}
+                            {/* Officer: Send for Approval if submitted */}
+                            {can('compareQuotations') && q.status === 'submitted' && (
+                              <button
+                                onClick={() => handleSendForApproval(q)}
+                                className="text-xs btn-primary py-1.5 px-3"
+                                title="Send this quotation for manager approval"
+                              >
+                                <Send size={12} />
+                                Send
+                              </button>
+                            )}
 
-                          {/* Accepted: Show PO link */}
-                          {q.status === 'accepted' && (
-                            <button
-                              onClick={() => navigate('/purchase-orders')}
-                              className="text-xs py-1.5 px-3 rounded-lg bg-green-50 text-green-700 font-schibsted font-semibold hover:bg-green-100 transition-colors flex items-center gap-1"
-                            >
-                              <ShoppingCart size={12} />
-                              View PO
-                            </button>
-                          )}
-                        </div>
+                            {/* Accepted: Show PO link */}
+                            {q.status === 'accepted' && (
+                              <button
+                                onClick={() => navigate('/purchase-orders')}
+                                className="text-xs py-1.5 px-3 rounded-lg bg-green-50 text-green-700 font-schibsted font-semibold hover:bg-green-100 transition-colors flex items-center gap-1"
+                              >
+                                <ShoppingCart size={12} />
+                                View PO
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

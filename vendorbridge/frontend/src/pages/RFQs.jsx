@@ -1,21 +1,28 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, FileText, Eye } from 'lucide-react';
+import { Plus, Search, FileText, Eye, Send } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { useRBAC } from '../hooks/useRBAC';
+import { useAuthStore } from '../store/authStore';
+import { QuotationSubmitModal } from './QuotationSubmit';
 import { formatDate, getStatusBadgeClass, getStatusLabel, daysUntil } from '../lib/utils';
 import api from '../lib/api';
 
-const statusTabs = ['All', 'draft', 'open', 'closed', 'cancelled'];
+const internalStatusTabs = ['All', 'draft', 'open', 'closed', 'cancelled'];
+const vendorStatusTabs = ['All', 'open'];
 
 const priorityBadge = { high: 'badge-red', medium: 'badge-amber', low: 'badge-green' };
 
 export default function RFQs() {
   const { can } = useRBAC();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
   const [tab, setTab] = useState('All');
   const [search, setSearch] = useState('');
+  const [quoteRfqId, setQuoteRfqId] = useState(null);
+  const isVendor = user?.role === 'vendor';
+  const statusTabs = isVendor ? vendorStatusTabs : internalStatusTabs;
 
   const { data, isLoading } = useQuery({
     queryKey: ['rfqs', tab, search],
@@ -31,7 +38,7 @@ export default function RFQs() {
     <AppLayout>
       <div className="space-y-5">
         <div className="flex items-center justify-between">
-          <h1 className="page-title">RFQs</h1>
+          <h1 className="page-title">{isVendor ? 'RFQ Invitations' : 'RFQs'}</h1>
           {can('createRFQ') && (
             <button onClick={() => navigate('/rfqs/new')} className="btn-primary">
               <Plus size={16} /> Create RFQ
@@ -73,7 +80,7 @@ export default function RFQs() {
           ) : !data || data.length === 0 ? (
             <div className="empty-state">
               <FileText size={40} className="text-gray-200" />
-              <p className="text-gray-500 font-inter">No RFQs found</p>
+              <p className="text-gray-500 font-inter">{isVendor ? 'No RFQ invitations found' : 'No RFQs found'}</p>
               {can('createRFQ') && (
                 <button onClick={() => navigate('/rfqs/new')} className="btn-primary text-sm mt-2">Create First RFQ</button>
               )}
@@ -84,7 +91,7 @@ export default function RFQs() {
                 <thead>
                   <tr>
                     <th>RFQ #</th><th>Title</th><th>Category</th><th>Priority</th>
-                    <th>Deadline</th><th>Vendors</th><th>Quotations</th><th>Status</th><th>Actions</th>
+                    <th>Deadline</th><th>Vendors</th><th>Items</th><th>Status</th><th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -121,12 +128,22 @@ export default function RFQs() {
                         <td className="font-noto">{rfq.rfq_items?.length || 0} items</td>
                         <td><span className={`badge ${getStatusBadgeClass(rfq.status)}`}>{getStatusLabel(rfq.status)}</span></td>
                         <td>
-                          <button
-                            onClick={() => navigate(`/rfqs/${rfq.id}`)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 text-gray-500 transition-colors"
-                          >
-                            <Eye size={15} />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => navigate(`/rfqs/${rfq.id}`)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 text-gray-500 transition-colors"
+                            >
+                              <Eye size={15} />
+                            </button>
+                            {can('submitQuotation') && rfq.status === 'open' && (
+                              <button
+                                onClick={() => setQuoteRfqId(rfq.id)}
+                                className="text-xs btn-primary py-1.5 px-3"
+                              >
+                                <Send size={13} /> Quote
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -137,6 +154,12 @@ export default function RFQs() {
           )}
         </div>
       </div>
+      {quoteRfqId && (
+        <QuotationSubmitModal
+          rfqId={quoteRfqId}
+          onClose={() => setQuoteRfqId(null)}
+        />
+      )}
     </AppLayout>
   );
 }

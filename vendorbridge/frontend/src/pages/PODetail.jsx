@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Download, FileText, Plus, Loader2 } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { ChevronLeft, Download, Plus, Loader2 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
+import { useRBAC } from '../hooks/useRBAC';
 import { formatDate, formatCurrency, getStatusBadgeClass, getStatusLabel } from '../lib/utils';
 import api from '../lib/api';
 import { supabase } from '../lib/supabase';
@@ -52,7 +53,7 @@ function InvoiceModal({ po, onClose, onCreated }) {
 export default function PODetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const qc = useQueryClient();
+  const { can } = useRBAC();
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   const { data: po, isLoading } = useQuery({
@@ -94,9 +95,11 @@ export default function PODetail() {
               <button onClick={downloadPDF} className="btn-outline text-sm">
                 <Download size={14} /> Download PDF
               </button>
-              <button onClick={() => setShowInvoiceModal(true)} className="btn-primary text-sm">
-                <Plus size={14} /> Generate Invoice
-              </button>
+              {can('generateInvoice') && (
+                <button onClick={() => setShowInvoiceModal(true)} className="btn-primary text-sm">
+                  <Plus size={14} /> Generate Invoice
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -177,7 +180,7 @@ export default function PODetail() {
         </div>
       </div>
 
-      {showInvoiceModal && (
+      {showInvoiceModal && can('generateInvoice') && (
         <InvoiceModal
           po={po}
           onClose={() => setShowInvoiceModal(false)}

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Download, Send, Loader2 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
+import { useRBAC } from '../hooks/useRBAC';
 import { formatDate, formatCurrency, getStatusBadgeClass, getStatusLabel } from '../lib/utils';
 import api from '../lib/api';
 import { supabase } from '../lib/supabase';
@@ -58,6 +59,7 @@ function SendModal({ invoice, onClose }) {
 export default function InvoiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { can } = useRBAC();
   const [showSendModal, setShowSendModal] = useState(false);
 
   const { data: invoice, isLoading } = useQuery({
@@ -100,9 +102,11 @@ export default function InvoiceDetail() {
               <button onClick={downloadPDF} className="btn-outline text-sm">
                 <Download size={14} /> Download PDF
               </button>
-              <button onClick={() => setShowSendModal(true)} className="btn-primary text-sm">
-                <Send size={14} /> Send to Vendor
-              </button>
+              {can('sendInvoice') && (
+                <button onClick={() => setShowSendModal(true)} className="btn-primary text-sm">
+                  <Send size={14} /> Send to Vendor
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -125,15 +129,16 @@ export default function InvoiceDetail() {
           {/* Bill From / To */}
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
-              <p className="text-xs font-schibsted font-semibold text-gray-400 uppercase tracking-wider mb-2">From (Vendor)</p>
+              <p className="text-xs font-schibsted font-semibold text-gray-400 uppercase tracking-wider mb-2">From Procurement Officer</p>
+              <p className="font-semibold text-gray-900">{invoice.profiles?.full_name || 'Procurement Officer'}</p>
+              <p className="text-gray-500 text-sm">Your Organisation</p>
+              <p className="text-gray-400 text-xs">VendorBridge ERP</p>
+            </div>
+            <div>
+              <p className="text-xs font-schibsted font-semibold text-gray-400 uppercase tracking-wider mb-2">Bill To (Vendor)</p>
               <p className="font-semibold text-gray-900">{invoice.vendors?.company_name}</p>
               {invoice.vendors?.address && <p className="text-gray-500 text-sm">{invoice.vendors.address}</p>}
               {invoice.vendors?.gst_number && <p className="text-gray-400 text-xs">GST: {invoice.vendors.gst_number}</p>}
-            </div>
-            <div>
-              <p className="text-xs font-schibsted font-semibold text-gray-400 uppercase tracking-wider mb-2">Bill To</p>
-              <p className="font-semibold text-gray-900">Your Organisation</p>
-              <p className="text-gray-500 text-sm">VendorBridge ERP</p>
             </div>
           </div>
 
@@ -184,7 +189,7 @@ export default function InvoiceDetail() {
         </div>
       </div>
 
-      {showSendModal && <SendModal invoice={invoice} onClose={() => setShowSendModal(false)} />}
+      {showSendModal && can('sendInvoice') && <SendModal invoice={invoice} onClose={() => setShowSendModal(false)} />}
     </AppLayout>
   );
 }

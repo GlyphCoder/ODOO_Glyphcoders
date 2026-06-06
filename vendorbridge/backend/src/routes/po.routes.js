@@ -5,11 +5,12 @@ import { getPOs, createPO, getPO, updatePOStatus, getPOPDF } from '../controller
 
 const router = express.Router();
 const internal = ['admin', 'manager', 'procurement_officer'];
+const readRoles = [...internal, 'vendor'];
 
-router.get('/', auth, requireRoles(...internal), getPOs);
+router.get('/', auth, requireRoles(...readRoles), getPOs);
 router.post('/', auth, requireRoles(...internal), createPO);
-router.get('/:id', auth, requireRoles(...internal), getPO);
+router.get('/:id', auth, requireRoles(...readRoles), getPO);
 router.put('/:id/status', auth, requireRoles(...internal), updatePOStatus);
-router.get('/:id/pdf', auth, requireRoles(...internal), getPOPDF);
+router.get('/:id/pdf', auth, requireRoles(...readRoles), getPOPDF);
 
 export default router;

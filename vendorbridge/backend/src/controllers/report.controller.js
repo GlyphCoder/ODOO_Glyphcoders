@@ -1,9 +1,62 @@
 import { supabaseAdmin } from '../config/supabase.js';
+import { requireVendorIdForUser } from '../utils/vendorAccess.js';
 
 export const getReportDashboard = async (req, res) => {
   try {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    if (req.user.role === 'vendor') {
+      const vendorId = await requireVendorIdForUser(supabaseAdmin, req.user.id, res);
+      if (!vendorId) return;
+
+      const { data: invitedRFQs } = await supabaseAdmin
+        .from('rfq_vendors')
+        .select('rfq_id, rfqs(status)')
+        .eq('vendor_id', vendorId);
+
+      const [monthPOs, monthInvoices, recentTrend] = await Promise.all([
+        supabaseAdmin
+          .from('purchase_orders')
+          .select('id', { count: 'exact' })
+          .eq('vendor_id', vendorId)
+          .gte('created_at', monthStart),
+        supabaseAdmin
+          .from('invoices')
+          .select('total_amount')
+          .eq('vendor_id', vendorId)
+          .gte('created_at', monthStart),
+        supabaseAdmin
+          .from('invoices')
+          .select('total_amount, created_at')
+          .eq('vendor_id', vendorId)
+          .order('created_at', { ascending: false })
+          .limit(30),
+      ]);
+
+      const totalInvoicedMonth = (monthInvoices.data || []).reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+      const trendMap = {};
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = d.toLocaleString('en-IN', { month: 'short', year: '2-digit' });
+        trendMap[key] = 0;
+      }
+      (recentTrend.data || []).forEach(inv => {
+        const d = new Date(inv.created_at);
+        const key = d.toLocaleString('en-IN', { month: 'short', year: '2-digit' });
+        if (trendMap[key] !== undefined) trendMap[key] += inv.total_amount || 0;
+      });
+
+      return res.json({
+        data: {
+          pending_approvals: 0,
+          active_rfqs: (invitedRFQs || []).filter(row => row.rfqs?.status === 'open').length,
+          total_pos_month: monthPOs.count || 0,
+          total_invoiced_month: totalInvoicedMonth,
+          trends: Object.entries(trendMap).map(([month, amount]) => ({ month, amount })),
+        },
+      });
+    }
 
     const [pendingApprovals, activeRFQs, monthPOs, monthInvoices, recentTrend] = await Promise.all([
       supabaseAdmin.from('approvals').select('id', { count: 'exact' }).eq('status', 'pending'),

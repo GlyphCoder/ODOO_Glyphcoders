@@ -6,7 +6,7 @@ import { getReportDashboard, getVendorPerformance, getSpending, getCategorySpend
 const router = express.Router();
 const internal = ['admin', 'manager', 'procurement_officer'];
 
-router.get('/dashboard', auth, requireRoles(...internal), getReportDashboard);
+router.get('/dashboard', auth, requireRoles(...internal, 'vendor'), getReportDashboard);
 router.get('/vendor-performance', auth, requireRoles(...internal), getVendorPerformance);
 router.get('/spending', auth, requireRoles(...internal), getSpending);
 router.get('/category-spending', auth, requireRoles(...internal), getCategorySpending);

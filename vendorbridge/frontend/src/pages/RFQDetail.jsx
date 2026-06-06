@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Send, X, BarChart2, FileText, CheckCircle, Activity, Loader2, Download } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { useRBAC } from '../hooks/useRBAC';
+import { useAuthStore } from '../store/authStore';
+import { QuotationSubmitModal } from './QuotationSubmit';
 import { formatDate, formatCurrency, getStatusBadgeClass, getStatusLabel } from '../lib/utils';
 import api from '../lib/api';
 import { toast } from 'sonner';
@@ -14,8 +16,12 @@ export default function RFQDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { can } = useRBAC();
+  const { user } = useAuthStore();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState('Details');
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const isVendor = user?.role === 'vendor';
+  const visibleTabs = isVendor ? ['Details'] : tabs;
 
   const { data: rfq, isLoading } = useQuery({
     queryKey: ['rfq', id],
@@ -25,7 +31,7 @@ export default function RFQDetail() {
   const { data: quotations } = useQuery({
     queryKey: ['rfq-quotations', id],
     queryFn: () => api.get(`/rfqs/${id}/quotations`).then(r => r.data.data),
-    enabled: activeTab === 'Quotations',
+    enabled: activeTab === 'Quotations' && can('compareQuotations'),
   });
 
   const closeMut = useMutation({
@@ -84,6 +90,11 @@ export default function RFQDetail() {
               {rfq.status === 'open' && can('createRFQ') && (
                 <button onClick={() => closeMut.mutate()} className="btn-outline text-sm">Close RFQ</button>
               )}
+              {rfq.status === 'open' && can('submitQuotation') && (
+                <button onClick={() => setShowQuoteModal(true)} className="btn-primary">
+                  <Send size={14} /> Submit Quotation
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -108,7 +119,7 @@ export default function RFQDetail() {
         {/* Tabs */}
         <div className="card p-0">
           <div className="flex border-b border-gray-100 px-6">
-            {tabs.map(t => (
+            {visibleTabs.map(t => (
               <button
                 key={t}
                 onClick={() => setActiveTab(t)}
@@ -194,7 +205,7 @@ export default function RFQDetail() {
                 ) : (
                   <div className="table-container">
                     <table className="data-table">
-                      <thead><tr><th>Vendor</th><th>Delivery Days</th><th>Payment Terms</th><th>Total Amount</th><th>Status</th>{can('compareQuotations') && <th>Action</th>}</tr></thead>
+                      <thead><tr><th>Vendor</th><th>Delivery Days</th><th>Payment Terms</th><th>Total Amount</th><th>Status</th><th>Action</th></tr></thead>
                       <tbody>
                         {quotations.map(q => (
                           <tr key={q.id}>
@@ -203,17 +214,23 @@ export default function RFQDetail() {
                             <td>{q.payment_terms}</td>
                             <td className="font-noto font-semibold">{formatCurrency(q.total_amount)}</td>
                             <td><span className={`badge ${getStatusBadgeClass(q.status)}`}>{getStatusLabel(q.status)}</span></td>
-                            {can('compareQuotations') && (
-                              <td>
-                                {q.status === 'submitted' && (
+                            <td>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => navigate(`/quotations/${q.id}`)}
+                                  className="text-xs btn-outline py-1.5 px-3"
+                                >
+                                  View
+                                </button>
+                                {can('compareQuotations') && q.status === 'submitted' && (
                                   <button
                                     onClick={() => navigate(`/approvals/new?quotation_id=${q.id}&rfq_id=${id}`)}
-                                    className="btn-primary text-xs py-1.5 px-3"
+                                    className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1"
                                   >
                                     <Send size={12} /> Send for Approval
                                   </button>
                                 )}
-                                {(q.status === 'under_review' || q.status === 'accepted') && (
+                                {can('compareQuotations') && (q.status === 'under_review' || q.status === 'accepted') && (
                                   <button
                                     onClick={() => navigate('/approvals')}
                                     className="btn-outline text-xs py-1.5 px-3"
@@ -221,8 +238,8 @@ export default function RFQDetail() {
                                     View Approval
                                   </button>
                                 )}
-                              </td>
-                            )}
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -248,6 +265,13 @@ export default function RFQDetail() {
           </div>
         </div>
       </div>
+      {showQuoteModal && (
+        <QuotationSubmitModal
+          rfqId={id}
+          onClose={() => setShowQuoteModal(false)}
+          onSubmitted={() => qc.invalidateQueries(['rfq', id])}
+        />
+      )}
     </AppLayout>
   );
 }

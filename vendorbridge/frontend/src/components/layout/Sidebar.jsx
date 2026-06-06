@@ -11,11 +11,11 @@ import { toast } from 'sonner';
 const navItems = [
   { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/vendors',         icon: Building2,        label: 'Vendors',         perm: 'manageVendors' },
-  { to: '/rfqs',            icon: FileText,         label: 'RFQs' },
+  { to: '/rfqs',            icon: FileText,         label: 'RFQs',            perm: 'viewRFQs' },
   { to: '/quotations',      icon: MessageSquare,    label: 'Quotations' },
   { to: '/approvals',       icon: CheckCircle,      label: 'Approvals',       perm: 'approveRFQ' },
-  { to: '/purchase-orders', icon: ShoppingCart,     label: 'Purchase Orders', perm: 'generatePO' },
-  { to: '/invoices',        icon: Receipt,          label: 'Invoices',        perm: 'generateInvoice' },
+  { to: '/purchase-orders', icon: ShoppingCart,     label: 'Purchase Orders', perm: 'viewPOs' },
+  { to: '/invoices',        icon: Receipt,          label: 'Invoices',        perm: 'viewInvoices' },
   { to: '/reports',         icon: BarChart2,        label: 'Reports',         perm: 'viewReports' },
   { to: '/activity-logs',   icon: Activity,         label: 'Activity Logs',   perm: 'viewLogs' },
 ];

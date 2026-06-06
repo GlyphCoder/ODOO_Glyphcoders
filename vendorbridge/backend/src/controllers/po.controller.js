@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../config/supabase.js';
 import { generateInvoicePDF, generatePOHTML } from '../services/pdf.service.js';
+import { assertVendorScope, requireVendorIdForUser } from '../utils/vendorAccess.js';
 import puppeteer from 'puppeteer';
 
 export const getPOs = async (req, res) => {
@@ -10,7 +11,13 @@ export const getPOs = async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (req.query.status) query = query.eq('status', req.query.status);
-    if (req.query.vendor_id) query = query.eq('vendor_id', req.query.vendor_id);
+    if (req.user.role === 'vendor') {
+      const vendorId = await assertVendorScope(supabaseAdmin, req, res, req.query.vendor_id || null);
+      if (!vendorId) return;
+      query = query.eq('vendor_id', vendorId);
+    } else if (req.query.vendor_id) {
+      query = query.eq('vendor_id', req.query.vendor_id);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -36,11 +43,18 @@ export const createPO = async (req, res) => {
 
 export const getPO = async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('purchase_orders')
       .select('*, vendors(*), rfqs(*, rfq_items(*)), quotations(*, quotation_items(*), vendors(*)), profiles!purchase_orders_created_by_fkey(full_name)')
-      .eq('id', req.params.id)
-      .single();
+      .eq('id', req.params.id);
+
+    if (req.user.role === 'vendor') {
+      const vendorId = await requireVendorIdForUser(supabaseAdmin, req.user.id, res);
+      if (!vendorId) return;
+      query = query.eq('vendor_id', vendorId);
+    }
+
+    const { data, error } = await query.single();
     if (error) throw error;
     res.json({ data });
   } catch (err) {
@@ -66,11 +80,19 @@ export const updatePOStatus = async (req, res) => {
 
 export const getPOPDF = async (req, res) => {
   try {
-    const { data: po } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('purchase_orders')
       .select('*, vendors(*), rfqs(rfq_number, rfq_items(*)), quotations(quotation_items(*), payment_terms)')
-      .eq('id', req.params.id)
-      .single();
+      .eq('id', req.params.id);
+
+    if (req.user.role === 'vendor') {
+      const vendorId = await requireVendorIdForUser(supabaseAdmin, req.user.id, res);
+      if (!vendorId) return;
+      query = query.eq('vendor_id', vendorId);
+    }
+
+    const { data: po, error } = await query.single();
+    if (error) throw error;
 
     const items = (po.quotations?.quotation_items || po.rfqs?.rfq_items || []).map(item => ({
       product_name: item.product_name,

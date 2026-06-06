@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../config/supabase.js';
 import { generateInvoicePDF } from '../services/pdf.service.js';
 import { sendInvoiceEmail } from '../services/email.service.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { assertVendorScope, requireVendorIdForUser } from '../utils/vendorAccess.js';
 
 const escapeHtml = (value = '') => String(value)
   .replace(/&/g, '&amp;')
@@ -75,15 +76,16 @@ const buildInvoiceEmailHTML = ({ invoice, items, note }) => `
 
     <div class="section grid">
       <div>
-        <div class="label">From (Vendor)</div>
+        <div class="label">From Procurement Officer</div>
+        <div class="strong">${escapeHtml(invoice.profiles?.full_name || 'Procurement Officer')}</div>
+        <div class="muted">Your Organisation</div>
+        <div class="muted">VendorBridge ERP</div>
+      </div>
+      <div>
+        <div class="label">Bill To (Vendor)</div>
         <div class="strong">${escapeHtml(invoice.vendors?.company_name || 'Vendor')}</div>
         <div class="muted">${escapeHtml(invoice.vendors?.address || '')}</div>
         ${invoice.vendors?.gst_number ? `<div class="muted">GST: ${escapeHtml(invoice.vendors.gst_number)}</div>` : ''}
-      </div>
-      <div>
-        <div class="label">Bill To</div>
-        <div class="strong">Your Organisation</div>
-        <div class="muted">VendorBridge ERP</div>
       </div>
     </div>
 
@@ -138,8 +140,14 @@ export const getInvoices = async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (req.query.status) query = query.eq('status', req.query.status);
-    if (req.query.vendor_id) query = query.eq('vendor_id', req.query.vendor_id);
     if (req.query.po_id) query = query.eq('po_id', req.query.po_id);
+    if (req.user.role === 'vendor') {
+      const vendorId = await assertVendorScope(supabaseAdmin, req, res, req.query.vendor_id || null);
+      if (!vendorId) return;
+      query = query.eq('vendor_id', vendorId);
+    } else if (req.query.vendor_id) {
+      query = query.eq('vendor_id', req.query.vendor_id);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -194,11 +202,18 @@ export const createInvoice = async (req, res) => {
 
 export const getInvoice = async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('invoices')
-      .select('*, vendors(*), purchase_orders(*, quotations(*, quotation_items(*)))')
-      .eq('id', req.params.id)
-      .single();
+      .select('*, vendors(*), purchase_orders(*, quotations(*, quotation_items(*))), profiles!invoices_created_by_fkey(full_name)')
+      .eq('id', req.params.id);
+
+    if (req.user.role === 'vendor') {
+      const vendorId = await requireVendorIdForUser(supabaseAdmin, req.user.id, res);
+      if (!vendorId) return;
+      query = query.eq('vendor_id', vendorId);
+    }
+
+    const { data, error } = await query.single();
     if (error) throw error;
     res.json({ data });
   } catch (err) {
@@ -223,11 +238,19 @@ export const updateInvoice = async (req, res) => {
 
 export const getInvoicePDF = async (req, res) => {
   try {
-    const { data: invoice } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('invoices')
-      .select('*, vendors(*), purchase_orders(po_number, quotations(payment_terms, quotation_items(*)))')
-      .eq('id', req.params.id)
-      .single();
+      .select('*, vendors(*), purchase_orders(po_number, quotations(payment_terms, quotation_items(*))), profiles!invoices_created_by_fkey(full_name)')
+      .eq('id', req.params.id);
+
+    if (req.user.role === 'vendor') {
+      const vendorId = await requireVendorIdForUser(supabaseAdmin, req.user.id, res);
+      if (!vendorId) return;
+      query = query.eq('vendor_id', vendorId);
+    }
+
+    const { data: invoice, error } = await query.single();
+    if (error) throw error;
 
     const items = mapInvoiceItems(invoice);
 
@@ -252,7 +275,7 @@ export const sendInvoice = async (req, res) => {
     const { to, cc, subject, message } = req.body;
     const { data: invoice } = await supabaseAdmin
       .from('invoices')
-      .select('*, vendors(*), purchase_orders(po_number, quotations(payment_terms, quotation_items(*)))')
+      .select('*, vendors(*), purchase_orders(po_number, quotations(payment_terms, quotation_items(*))), profiles!invoices_created_by_fkey(full_name)')
       .eq('id', req.params.id)
       .single();
 

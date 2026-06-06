@@ -5,12 +5,13 @@ import { getInvoices, createInvoice, getInvoice, updateInvoice, getInvoicePDF, s
 
 const router = express.Router();
 const internal = ['admin', 'manager', 'procurement_officer'];
+const readRoles = [...internal, 'vendor'];
 
-router.get('/', auth, requireRoles(...internal), getInvoices);
+router.get('/', auth, requireRoles(...readRoles), getInvoices);
 router.post('/', auth, requireRoles(...internal), createInvoice);
-router.get('/:id', auth, requireRoles(...internal), getInvoice);
+router.get('/:id', auth, requireRoles(...readRoles), getInvoice);
 router.put('/:id', auth, requireRoles(...internal), updateInvoice);
-router.get('/:id/pdf', auth, requireRoles(...internal), getInvoicePDF);
+router.get('/:id/pdf', auth, requireRoles(...readRoles), getInvoicePDF);
 router.post('/:id/send', auth, requireRoles(...internal), sendInvoice);
 
 export default router;

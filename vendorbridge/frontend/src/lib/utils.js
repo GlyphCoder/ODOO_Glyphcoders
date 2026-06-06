@@ -51,7 +51,7 @@ export function getStatusBadgeClass(status) {
     active: 'badge-green', approved: 'badge-green', accepted: 'badge-green', completed: 'badge-green', paid: 'badge-green', open: 'badge-green',
     inactive: 'badge-red', rejected: 'badge-red', cancelled: 'badge-red', overdue: 'badge-red',
     pending: 'badge-amber', under_review: 'badge-amber', sent: 'badge-amber', submitted: 'badge-amber', acknowledged: 'badge-amber',
-    draft: 'badge-gray', closed: 'badge-gray', generated: 'badge-gray',
+    draft: 'badge-gray', closed: 'badge-gray', generated: 'badge-gray', withdrawn: 'badge-gray',
   };
   return map[status] || 'badge-gray';
 }
@@ -61,6 +61,7 @@ export function getStatusLabel(status) {
     procurement_officer: 'Procurement Officer',
     under_review: 'Under Review',
     generated: 'Generated',
+    withdrawn: 'Withdrawn',
   };
   return map[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : '—');
 }

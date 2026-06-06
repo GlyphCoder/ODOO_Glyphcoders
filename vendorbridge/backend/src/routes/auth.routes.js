@@ -1,14 +1,44 @@
 import express from 'express';
 import { auth } from '../middleware/auth.middleware.js';
+import { requireRoles } from '../middleware/rbac.middleware.js';
 import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 const adminManager = ['admin', 'manager'];
 
+router.get('/demo-vendors', async (_req, res) => {
+  try {
+    if (process.env.ENABLE_DEMO_LOGIN !== 'true') {
+      return res.status(404).json({ error: 'Demo login is disabled' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('vendors')
+      .select('id, company_name, email, contact_person, category')
+      .order('company_name');
+    if (error) throw error;
+
+    res.json({
+      data: (data || []).map(vendor => ({
+        id: vendor.id,
+        company_name: vendor.company_name,
+        email: vendor.email,
+        contact_person: vendor.contact_person,
+        category: vendor.category,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Auth routes
-router.post('/signup', async (req, res) => {
+router.post('/signup', auth, requireRoles('admin'), async (req, res) => {
   try {
     const { full_name, email, password, role, phone } = req.body;
+    const allowedRoles = ['admin', 'manager', 'procurement_officer', 'vendor'];
+    const safeRole = allowedRoles.includes(role) ? role : 'procurement_officer';
+
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email, password,
       user_metadata: { full_name },
@@ -17,7 +47,7 @@ router.post('/signup', async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
 
     // Update profile with role and phone
-    await supabaseAdmin.from('profiles').update({ role: role || 'procurement_officer', phone, full_name }).eq('id', data.user.id);
+    await supabaseAdmin.from('profiles').update({ role: safeRole, phone, full_name }).eq('id', data.user.id);
 
     res.status(201).json({ message: 'User created', userId: data.user.id });
   } catch (err) {
@@ -72,7 +102,7 @@ router.get('/managers', auth, async (req, res) => {
 });
 
 // Activity logs
-router.get('/activity-logs', auth, async (req, res) => {
+router.get('/activity-logs', auth, requireRoles(...adminManager), async (req, res) => {
   try {
     let query = supabaseAdmin
       .from('activity_logs')
