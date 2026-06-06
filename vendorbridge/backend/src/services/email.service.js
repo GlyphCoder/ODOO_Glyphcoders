@@ -1,9 +1,43 @@
 import nodemailer from 'nodemailer';
 import { google } from 'googleapis';
 
+const fromAddress = () => `"VendorBridge" <${process.env.GMAIL_USER || process.env.SMTP_USER || 'noreply@vendorbridge.com'}>`;
+
 const createTransporter = async () => {
-  // If Gmail credentials not set, use a test transporter
-  if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_REFRESH_TOKEN) {
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '');
+
+  if (process.env.GMAIL_USER && gmailAppPassword) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: gmailAppPassword,
+      },
+    });
+  }
+
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+
+  const hasOAuthConfig = process.env.GMAIL_CLIENT_ID
+    && process.env.GMAIL_CLIENT_SECRET
+    && process.env.GMAIL_REFRESH_TOKEN
+    && process.env.GMAIL_USER
+    && !process.env.GMAIL_CLIENT_ID.includes('XXXX')
+    && !process.env.GMAIL_CLIENT_SECRET.includes('XXXX')
+    && !process.env.GMAIL_REFRESH_TOKEN.includes('XXXX');
+
+  // If real credentials are not set, use a local test SMTP server.
+  if (!hasOAuthConfig) {
     return nodemailer.createTransport({
       host: 'localhost',
       port: 1025,
@@ -17,7 +51,18 @@ const createTransporter = async () => {
     'https://developers.google.com/oauthplayground'
   );
   oauth2.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
-  const { token } = await oauth2.getAccessToken();
+  let token;
+
+  try {
+    ({ token } = await oauth2.getAccessToken());
+  } catch (error) {
+    if (error.message === 'invalid_client' || error.response?.data?.error === 'invalid_client') {
+      throw new Error(
+        'Gmail OAuth client is invalid. Update GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET, or use GMAIL_APP_PASSWORD with GMAIL_USER.'
+      );
+    }
+    throw error;
+  }
 
   return nodemailer.createTransport({
     service: 'gmail',
@@ -35,7 +80,7 @@ const createTransporter = async () => {
 export const sendInvoiceEmail = async ({ to, cc, subject, html, pdfBuffer, invoiceNumber }) => {
   const transport = await createTransporter();
   await transport.sendMail({
-    from: `"VendorBridge" <${process.env.GMAIL_USER || 'noreply@vendorbridge.com'}>`,
+    from: fromAddress(),
     to,
     cc,
     subject: subject || `Invoice ${invoiceNumber} from VendorBridge`,
@@ -49,7 +94,7 @@ export const sendInvoiceEmail = async ({ to, cc, subject, html, pdfBuffer, invoi
 export const sendRFQInvitation = async ({ to, rfqNumber, rfqTitle, deadline, submissionLink }) => {
   const transport = await createTransporter();
   await transport.sendMail({
-    from: `"VendorBridge" <${process.env.GMAIL_USER || 'noreply@vendorbridge.com'}>`,
+    from: fromAddress(),
     to,
     subject: `RFQ Invitation: ${rfqTitle} [${rfqNumber}]`,
     html: `

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Download, Send, Loader2 } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { formatDate, formatCurrency, getStatusBadgeClass, getStatusLabel } from '../lib/utils';
@@ -9,13 +9,19 @@ import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
 function SendModal({ invoice, onClose }) {
+  const queryClient = useQueryClient();
   const [to, setTo] = useState(invoice.vendors?.email || '');
   const [subject, setSubject] = useState(`Invoice ${invoice.invoice_number}`);
   const [message, setMessage] = useState('');
 
   const mutation = useMutation({
     mutationFn: () => api.post(`/invoices/${invoice.id}/send`, { to, subject, message }),
-    onSuccess: () => { toast.success('Invoice sent!'); onClose(); },
+    onSuccess: () => {
+      toast.success('Invoice sent to vendor');
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      onClose();
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -39,7 +45,7 @@ function SendModal({ invoice, onClose }) {
         </div>
         <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="btn-outline flex-1">Cancel</button>
-          <button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="btn-primary flex-1 justify-center">
+          <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !to.trim()} className="btn-primary flex-1 justify-center">
             {mutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
             Send
           </button>
