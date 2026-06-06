@@ -1,6 +1,6 @@
 # VendorBridge
 
-![VendorBridge Preview](https://via.placeholder.com/1200x600?text=VendorBridge+-+Modern+Procurement+%26+Vendor+Management)
+![VendorBridge Preview](./preview.png)
 
 VendorBridge is a modern, full-stack Procurement and Vendor Management System. It streamlines the entire supply chain workflow, from managing vendors and initiating Requests for Quotation (RFQs) to handling purchase orders, invoices, and multi-level approvals.
 
