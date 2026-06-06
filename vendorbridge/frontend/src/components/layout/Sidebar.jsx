@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 const navItems = [
   { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/vendors',         icon: Building2,        label: 'Vendors',         perm: 'manageVendors' },
-  { to: '/rfqs',            icon: FileText,         label: 'RFQs',            perm: 'createRFQ' },
+  { to: '/rfqs',            icon: FileText,         label: 'RFQs' },
   { to: '/quotations',      icon: MessageSquare,    label: 'Quotations' },
   { to: '/approvals',       icon: CheckCircle,      label: 'Approvals',       perm: 'approveRFQ' },
   { to: '/purchase-orders', icon: ShoppingCart,     label: 'Purchase Orders', perm: 'generatePO' },
@@ -50,7 +50,7 @@ export function Sidebar() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `sidebar-nav-item ${isActive ? 'active' : ''}`
+              `sidebar-nav-item ${isActive || (to !== '/dashboard' && window.location.pathname.startsWith(to)) ? 'active' : ''}`
             }
           >
             <Icon size={18} strokeWidth={1.8} />

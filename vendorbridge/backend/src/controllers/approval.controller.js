@@ -4,15 +4,26 @@ import { notifyUsers } from '../utils/notifyUsers.js';
 
 export const getApprovals = async (req, res) => {
   try {
+    // Note: We select approver and requester profiles separately to avoid Supabase
+    // "table name specified more than once" error with dual FK joins to profiles.
     let query = supabaseAdmin
       .from('approvals')
-      .select(`*, rfqs(rfq_number, title), quotations(total_amount, vendors(*)),
-               profiles!approvals_approver_id_fkey(full_name),
-               profiles!approvals_requested_by_fkey(full_name)`)
+      .select(`
+        id, rfq_id, quotation_id, approver_id, requested_by, status, remarks, approved_at, created_at,
+        rfqs(rfq_number, title),
+        quotations(total_amount, delivery_days, vendor_id, vendors(company_name, rating)),
+        approver:profiles!approvals_approver_id_fkey(full_name),
+        requester:profiles!approvals_requested_by_fkey(full_name)
+      `)
       .order('created_at', { ascending: false });
 
     if (req.query.status && req.query.status !== 'all') {
       query = query.eq('status', req.query.status);
+    }
+
+    // Filter by approver for managers — they only see what's assigned to them
+    if (req.user.role === 'manager') {
+      query = query.eq('approver_id', req.user.id);
     }
 
     const { data, error } = await query;
@@ -64,9 +75,13 @@ export const getApproval = async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
       .from('approvals')
-      .select(`*, rfqs(*, rfq_items(*)), quotations(*, vendors(*), quotation_items(*)),
-               profiles!approvals_approver_id_fkey(full_name, email),
-               profiles!approvals_requested_by_fkey(full_name, email)`)
+      .select(`
+        id, rfq_id, quotation_id, approver_id, requested_by, status, remarks, approved_at, created_at,
+        rfqs(*, rfq_items(*)),
+        quotations(*, vendors(*), quotation_items(*)),
+        approver:profiles!approvals_approver_id_fkey(full_name, email),
+        requester:profiles!approvals_requested_by_fkey(full_name, email)
+      `)
       .eq('id', req.params.id)
       .single();
     if (error) throw error;
@@ -76,28 +91,40 @@ export const getApproval = async (req, res) => {
   }
 };
 
+
 export const approveApproval = async (req, res) => {
   try {
     const { remarks } = req.body;
     const approvalId = req.params.id;
 
     // Get approval details
-    const { data: approval } = await supabaseAdmin
+    const { data: approval, error: fetchErr } = await supabaseAdmin
       .from('approvals')
       .select('*, rfqs(*), quotations(*, vendors(*))')
       .eq('id', approvalId)
       .single();
+    if (fetchErr) throw fetchErr;
+    if (!approval) return res.status(404).json({ error: 'Approval not found' });
 
-    // Update approval
+    const quot = approval.quotations;
+    if (!quot) return res.status(400).json({ error: 'Approval has no linked quotation' });
+
+    // Update approval status
     await supabaseAdmin.from('approvals').update({
-      status: 'approved', remarks, approved_at: new Date().toISOString()
+      status: 'approved', remarks: remarks || '', approved_at: new Date().toISOString()
     }).eq('id', approvalId);
 
-    // Update quotation status
+    // Update quotation status to accepted
     await supabaseAdmin.from('quotations').update({ status: 'accepted' }).eq('id', approval.quotation_id);
 
+    // Reject other pending/under_review approvals for the same RFQ (only one vendor can win)
+    await supabaseAdmin.from('approvals')
+      .update({ status: 'rejected', remarks: 'Another vendor was selected' })
+      .eq('rfq_id', approval.rfq_id)
+      .neq('id', approvalId)
+      .in('status', ['pending', 'under_review']);
+
     // Auto-generate Purchase Order
-    const quot = approval.quotations;
     const { data: po, error: poErr } = await supabaseAdmin
       .from('purchase_orders')
       .insert({
@@ -107,32 +134,45 @@ export const approveApproval = async (req, res) => {
         approval_id: approvalId,
         delivery_address: 'To be specified',
         expected_delivery: new Date(Date.now() + (quot.delivery_days || 30) * 86400000).toISOString().split('T')[0],
-        payment_terms: quot.payment_terms,
-        subtotal: quot.subtotal,
-        tax_percentage: quot.tax_percentage,
-        tax_amount: quot.tax_amount,
-        total_amount: quot.total_amount,
+        terms_conditions: quot.payment_terms || quot.notes || 'Standard payment terms apply',
+        subtotal: quot.subtotal || 0,
+        tax_percentage: quot.tax_percentage || 18,
+        tax_amount: quot.tax_amount || 0,
+        total_amount: quot.total_amount || 0,
         created_by: req.user.id,
       })
       .select()
       .single();
     if (poErr) throw poErr;
 
-    // Update vendor total_orders
-    await supabaseAdmin.from('vendors')
-      .update({ total_orders: supabaseAdmin.raw('total_orders + 1') })
-      .eq('id', quot.vendor_id)
-      .catch(() => {});
+    // Increment vendor total_orders (non-critical, ignore failure)
+    try {
+      await supabaseAdmin.rpc('increment_vendor_orders', { vendor_id_param: quot.vendor_id });
+    } catch (_) {}
 
     // Notify requester
     await notifyUsers(supabaseAdmin, {
       userIds: [approval.requested_by],
-      title: 'Quotation Approved',
+      title: 'Quotation Approved ✅',
       message: `Your approval request has been approved. PO ${po.po_number} has been generated.`,
       type: 'approval',
       entityType: 'purchase_order',
       entityId: po.id,
     });
+
+    // Also notify the vendor
+    if (quot.vendor_id) {
+      const { data: vendorUser } = await supabaseAdmin
+        .from('vendor_users').select('user_id').eq('vendor_id', quot.vendor_id).single();
+      if (vendorUser) {
+        await notifyUsers(supabaseAdmin, {
+          userIds: [vendorUser.user_id],
+          title: 'Your Quotation was Accepted! 🎉',
+          message: `Your quotation has been approved. PO ${po.po_number} has been raised.`,
+          type: 'approval', entityType: 'purchase_order', entityId: po.id,
+        });
+      }
+    }
 
     await logActivity(supabaseAdmin, {
       userId: req.user.id, action: 'approved', entityType: 'approval',

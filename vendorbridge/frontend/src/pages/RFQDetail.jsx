@@ -75,6 +75,12 @@ export default function RFQDetail() {
                   Publish RFQ
                 </button>
               )}
+              {rfq.status === 'open' && can('submitQuotation') && (
+                <button onClick={() => navigate(`/quotations/submit/${rfq.id}`)} className="btn-primary">
+                  <Send size={14} />
+                  Submit Quotation
+                </button>
+              )}
               {rfq.status === 'open' && can('createRFQ') && (
                 <button onClick={() => closeMut.mutate()} className="btn-outline text-sm">Close RFQ</button>
               )}
@@ -170,14 +176,16 @@ export default function RFQDetail() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="section-label">Quotations Received ({quotations?.length || 0})</h3>
-                  {quotations && quotations.length >= 2 && can('compareQuotations') && (
-                    <button
-                      onClick={() => navigate(`/rfqs/${id}/compare`)}
-                      className="btn-primary text-sm"
-                    >
-                      <BarChart2 size={14} /> Compare Quotations
-                    </button>
-                  )}
+                  <div className="flex gap-2">
+                    {quotations && quotations.length >= 1 && can('compareQuotations') && (
+                      <button
+                        onClick={() => navigate(`/rfqs/${id}/compare`)}
+                        className="btn-primary text-sm"
+                      >
+                        <BarChart2 size={14} /> Compare & Select
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {!quotations || quotations.length === 0 ? (
                   <div className="empty-state">
@@ -186,7 +194,7 @@ export default function RFQDetail() {
                 ) : (
                   <div className="table-container">
                     <table className="data-table">
-                      <thead><tr><th>Vendor</th><th>Delivery Days</th><th>Payment Terms</th><th>Total Amount</th><th>Status</th></tr></thead>
+                      <thead><tr><th>Vendor</th><th>Delivery Days</th><th>Payment Terms</th><th>Total Amount</th><th>Status</th>{can('compareQuotations') && <th>Action</th>}</tr></thead>
                       <tbody>
                         {quotations.map(q => (
                           <tr key={q.id}>
@@ -195,6 +203,26 @@ export default function RFQDetail() {
                             <td>{q.payment_terms}</td>
                             <td className="font-noto font-semibold">{formatCurrency(q.total_amount)}</td>
                             <td><span className={`badge ${getStatusBadgeClass(q.status)}`}>{getStatusLabel(q.status)}</span></td>
+                            {can('compareQuotations') && (
+                              <td>
+                                {q.status === 'submitted' && (
+                                  <button
+                                    onClick={() => navigate(`/approvals/new?quotation_id=${q.id}&rfq_id=${id}`)}
+                                    className="btn-primary text-xs py-1.5 px-3"
+                                  >
+                                    <Send size={12} /> Send for Approval
+                                  </button>
+                                )}
+                                {(q.status === 'under_review' || q.status === 'accepted') && (
+                                  <button
+                                    onClick={() => navigate('/approvals')}
+                                    className="btn-outline text-xs py-1.5 px-3"
+                                  >
+                                    View Approval
+                                  </button>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>

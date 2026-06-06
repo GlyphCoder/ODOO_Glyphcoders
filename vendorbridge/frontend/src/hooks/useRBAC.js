@@ -5,7 +5,7 @@ const PERMISSIONS = {
   approveRFQ:       ['admin', 'manager'],
   manageVendors:    ['admin', 'manager', 'procurement_officer'],
   deleteVendors:    ['admin'],
-  submitQuotation:  ['vendor'],
+  submitQuotation:  ['vendor', 'procurement_officer', 'admin', 'manager'],
   compareQuotations: ['admin', 'manager', 'procurement_officer'],
   generatePO:       ['admin', 'manager', 'procurement_officer'],
   generateInvoice:  ['admin', 'manager', 'procurement_officer'],

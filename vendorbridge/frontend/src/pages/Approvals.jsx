@@ -60,7 +60,7 @@ export default function Approvals() {
                       <td className="font-schibsted font-semibold">{a.rfqs?.rfq_number || '—'}</td>
                       <td className="font-medium">{a.quotations?.vendors?.company_name || '—'}</td>
                       <td className="font-noto font-semibold">{formatCurrency(a.quotations?.total_amount)}</td>
-                      <td className="text-gray-500">{a['profiles!approvals_requested_by_fkey']?.full_name || '—'}</td>
+                      <td className="text-gray-500">{a.requester?.full_name || a.approver?.full_name || '—'}</td>
                       <td className="text-gray-500 text-xs">{formatDate(a.created_at)}</td>
                       <td><span className={`badge ${getStatusBadgeClass(a.status)}`}>{getStatusLabel(a.status)}</span></td>
                       <td>

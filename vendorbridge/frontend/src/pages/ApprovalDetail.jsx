@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Check, X, Clock, ShoppingCart, Receipt, Loader2, Star } from 'lucide-react';
+import { ChevronLeft, Check, X, Clock, ShoppingCart, Receipt, Loader2, Star, Send } from 'lucide-react';
 import { AppLayout } from '../components/layout/AppLayout';
 import { formatDate, formatCurrency, getStatusBadgeClass, getStatusLabel } from '../lib/utils';
 import api from '../lib/api';
@@ -11,37 +11,36 @@ import { useAuthStore } from '../store/authStore';
 const NewApprovalForm = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
   const quotationId = searchParams.get('quotation_id');
   const rfqId = searchParams.get('rfq_id');
   const qc = useQueryClient();
+  const [selectedManagerId, setSelectedManagerId] = useState('');
 
-  const { data: profiles } = useQuery({
-    queryKey: ['approvers'],
-    queryFn: () => api.get('/vendors').then(() =>
-      // Fetch internal profiles for approver selection
-      fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/auth/me`, {
-        headers: { 'Content-Type': 'application/json' }
-      }).then(() => [])
-    ).catch(() => []),
+  const { data: managers, isLoading: loadingManagers } = useQuery({
+    queryKey: ['managers'],
+    queryFn: () => api.get('/auth/managers').then(r => r.data.data),
+  });
+
+  const { data: quotation } = useQuery({
+    queryKey: ['quotation-preview', quotationId],
+    queryFn: () => api.get(`/quotations/${quotationId}`).then(r => r.data.data),
+    enabled: !!quotationId,
   });
 
   const mutation = useMutation({
     mutationFn: (data) => api.post('/approvals', data),
     onSuccess: (res) => {
       toast.success('Approval request submitted!');
+      qc.invalidateQueries(['approvals']);
       navigate(`/approvals/${res.data.data.id}`);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(e.response?.data?.error || e.message),
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    mutation.mutate({
-      rfq_id: rfqId,
-      quotation_id: quotationId,
-      approver_id: user?.id, // self-approver for demo, or select from list
-    });
+    if (!selectedManagerId) return toast.error('Please select a manager to send to');
+    mutation.mutate({ rfq_id: rfqId, quotation_id: quotationId, approver_id: selectedManagerId });
   };
 
   return (
@@ -50,22 +49,48 @@ const NewApprovalForm = () => {
         <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-gray-700 font-inter mb-4 flex items-center gap-1">
           <ChevronLeft size={14} /> Back
         </button>
-        <div className="card">
-          <h1 className="page-title mb-6">Submit for Approval</h1>
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
-            <p className="text-sm text-blue-700 font-inter">
-              You are about to submit this quotation for approval. An admin or manager will review and approve the purchase.
-            </p>
+        <div className="card space-y-6">
+          <div>
+            <h1 className="page-title">Submit for Approval</h1>
+            <p className="text-sm text-gray-500 font-inter mt-1">Send this quotation to a manager for review and decision</p>
           </div>
-          <form onSubmit={handleSubmit}>
-            <p className="text-sm text-gray-600 font-inter mb-6">
-              RFQ ID: <strong>{rfqId}</strong><br />
-              Quotation ID: <strong>{quotationId}</strong>
-            </p>
+
+          {quotation && (
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-1">
+              <p className="text-xs font-schibsted font-bold text-blue-400 uppercase tracking-wider">Quotation Summary</p>
+              <p className="font-schibsted font-semibold text-blue-800">{quotation.vendors?.company_name}</p>
+              <div className="flex gap-4 text-sm text-blue-700">
+                <span>Total: <strong className="font-noto">{formatCurrency(quotation.total_amount)}</strong></span>
+                <span>Delivery: <strong>{quotation.delivery_days} days</strong></span>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="label font-semibold text-sm text-gray-700 mb-1.5 block">Send to Manager *</label>
+              {loadingManagers ? (
+                <div className="skeleton h-10 rounded-xl" />
+              ) : (
+                <select
+                  value={selectedManagerId}
+                  onChange={e => setSelectedManagerId(e.target.value)}
+                  className="input py-2.5 w-full font-medium text-gray-700"
+                  required
+                >
+                  <option value="">-- Select a Manager or Admin --</option>
+                  {(managers || []).map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.full_name} · {m.role}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => navigate(-1)} className="btn-outline flex-1">Cancel</button>
-              <button type="submit" disabled={mutation.isPending} className="btn-primary flex-1 justify-center">
-                {mutation.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
+              <button type="submit" disabled={mutation.isPending || !selectedManagerId} className="btn-primary flex-1 justify-center">
+                {mutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 Submit for Approval
               </button>
             </div>

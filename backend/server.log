@@ -1,0 +1,227 @@
+◇ injected env (4) from .env // tip: ⌘ enable debugging { debug: true }
+[Database] Connected to Supabase REST API client successfully!
+[Server] Running on http://localhost:5001
+[Supabase DB Error] getRfqs: Could not find the table 'public.rfqs' in the schema cache
+Error fetching RFQs: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] getRfqs: Could not find the table 'public.rfqs' in the schema cache
+Error fetching RFQs: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] getRfqs: Could not find the table 'public.rfqs' in the schema cache
+Error fetching RFQs: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] getQuotations: Could not find the table 'public.quotations' in the schema cache
+Error fetching quotations: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.quotations' in the schema cache"
+}
+[Supabase DB Error] getRfqs: Could not find the table 'public.rfqs' in the schema cache
+Error fetching RFQs: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] getRfqs: Could not find the table 'public.rfqs' in the schema cache
+Error fetching RFQs: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] getRfqs: Could not find the table 'public.rfqs' in the schema cache
+Error fetching RFQs: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: Could not find the table 'public.rfqs' in the schema cache
+Error creating RFQ: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] getRfqs: Could not find the table 'public.rfqs' in the schema cache
+Error fetching RFQs: {
+  code: 'PGRST205',
+  details: null,
+  hint: null,
+  message: "Could not find the table 'public.rfqs' in the schema cache"
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}
+[Supabase DB Error] createRfq: new row violates row-level security policy for table "rfqs"
+Error creating RFQ: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "rfqs"'
+}

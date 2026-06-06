@@ -15,11 +15,13 @@ export const getRFQs = async (req, res) => {
 
     // Vendors only see their assigned RFQs
     if (req.user.role === 'vendor') {
-      const { data: vendorUser } = await supabaseAdmin
-        .from('vendor_users').select('vendor_id').eq('user_id', req.user.id).single();
+      const { data: vendorUser, error: vuErr } = await supabaseAdmin
+        .from('vendor_users').select('vendor_id').eq('user_id', req.user.id).limit(1).maybeSingle();
+      console.log('[RFQ vendor filter] user_id:', req.user.id, '| vendorUser:', vendorUser, '| error:', vuErr?.message);
       if (vendorUser) {
-        const { data: rv } = await supabaseAdmin
+        const { data: rv, error: rvErr } = await supabaseAdmin
           .from('rfq_vendors').select('rfq_id').eq('vendor_id', vendorUser.vendor_id);
+        console.log('[RFQ vendor filter] vendor_id:', vendorUser.vendor_id, '| rfq_vendors:', rv?.length, '| error:', rvErr?.message);
         const rfqIds = (rv || []).map(r => r.rfq_id);
         if (rfqIds.length === 0) return res.json({ data: [] });
         query = query.in('id', rfqIds);

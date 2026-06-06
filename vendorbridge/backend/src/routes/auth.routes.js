@@ -56,6 +56,21 @@ router.put('/me', auth, async (req, res) => {
   }
 });
 
+// Get managers/admins for approver selection
+router.get('/managers', auth, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .select('id, full_name, email, role')
+      .in('role', ['admin', 'manager'])
+      .order('full_name');
+    if (error) throw error;
+    res.json({ data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Activity logs
 router.get('/activity-logs', auth, async (req, res) => {
   try {

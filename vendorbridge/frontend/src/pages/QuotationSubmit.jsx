@@ -1,25 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ChevronLeft, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useRBAC } from '../hooks/useRBAC';
+import { AppLayout } from '../components/layout/AppLayout';
 import { VideoBackground } from '../components/layout/VideoBackground';
 import { formatCurrency } from '../lib/utils';
 import api from '../lib/api';
-import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
 export default function QuotationSubmit() {
   const { rfq_id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { can, role } = useRBAC();
   const [items, setItems] = useState([]);
   const [taxPct, setTaxPct] = useState(18);
-  const [paymentTerms, setPaymentTerms] = useState('');
-  const [deliveryDays, setDeliveryDays] = useState('');
-  const [validityDays, setValidityDays] = useState(30);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState('Payment terms: 20 days net...');
   const [submitted, setSubmitted] = useState(false);
+  const [isDraftMode, setIsDraftMode] = useState(false);
+  const [selectedVendorId, setSelectedVendorId] = useState('');
 
   const { data: rfq, isLoading } = useQuery({
     queryKey: ['rfq-public', rfq_id],
@@ -34,6 +35,7 @@ export default function QuotationSubmit() {
         quantity: item.quantity,
         unit: item.unit,
         unit_price: '',
+        delivery_days: 7, // default 7 days
         notes: '',
       })));
     }
@@ -44,180 +46,270 @@ export default function QuotationSubmit() {
   const total = subtotal + taxAmount;
 
   const mutation = useMutation({
-    mutationFn: () => api.post('/quotations', {
-      rfq_id,
-      delivery_days: Number(deliveryDays),
-      payment_terms: paymentTerms,
-      validity_days: Number(validityDays),
-      notes,
-      tax_percentage: taxPct,
-      items: items.map(i => ({
-        rfq_item_id: i.rfq_item_id,
-        product_name: i.product_name,
-        quantity: Number(i.quantity),
-        unit: i.unit,
-        unit_price: Number(i.unit_price),
-        notes: i.notes,
-      })),
-    }),
-    onSuccess: () => { setSubmitted(true); toast.success('Quotation submitted!'); },
+    mutationFn: (status = 'submitted') => {
+      const payload = {
+        rfq_id,
+        delivery_days: items.length > 0 ? Math.max(...items.map(i => Number(i.delivery_days || 0))) : 7,
+        payment_terms: notes,
+        validity_days: 30,
+        notes,
+        tax_percentage: taxPct,
+        status, // 'draft' or 'submitted'
+        items: items.map(i => ({
+          rfq_item_id: i.rfq_item_id,
+          product_name: i.product_name,
+          quantity: Number(i.quantity),
+          unit: i.unit,
+          unit_price: Number(i.unit_price || 0),
+          delivery_days: Number(i.delivery_days || 7),
+          notes: i.notes || '',
+        })),
+      };
+      if (role !== 'vendor') {
+        payload.vendor_id = selectedVendorId;
+      }
+      return api.post('/quotations', payload);
+    },
+    onSuccess: (res, status) => {
+      setSubmitted(true);
+      setIsDraftMode(status === 'draft');
+      toast.success(status === 'draft' ? 'Draft saved successfully!' : 'Quotation submitted successfully!');
+    },
     onError: (e) => toast.error(e.message),
   });
 
-  // If vendor not logged in, show login reminder
+  // If user not logged in, show login reminder
   if (!user) {
     return (
       <div className="min-h-screen relative flex items-center justify-center">
         <VideoBackground />
         <div className="relative z-10 glass-card rounded-3xl p-10 max-w-md w-full text-center">
           <h2 className="font-fustat font-bold text-white text-2xl mb-3">Login Required</h2>
-          <p className="text-white/70 font-inter mb-6">Please log in with your vendor account to submit a quotation.</p>
+          <p className="text-white/70 font-inter mb-6">Please log in to submit a quotation.</p>
           <button onClick={() => navigate('/login')} className="btn-primary w-full justify-center">Go to Login</button>
         </div>
       </div>
     );
   }
 
-  if (submitted) {
+  // Access check
+  if (!can('submitQuotation')) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="card max-w-md w-full text-center p-12">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: '#dcfce7' }}>
-            <span className="text-4xl">✅</span>
+      <AppLayout>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <div className="card max-w-md w-full text-center p-10">
+            <h2 className="font-fustat font-bold text-red-600 text-2xl mb-3">Access Denied</h2>
+            <p className="text-gray-500 font-inter mb-6">You do not have permission to submit quotations.</p>
+            <button onClick={() => navigate('/dashboard')} className="btn-primary w-full justify-center">Go to Dashboard</button>
           </div>
-          <h2 className="font-fustat font-bold text-3xl text-gray-900 mb-2">Submitted!</h2>
-          <p className="text-gray-500 font-inter">Your quotation for <strong>{rfq?.title}</strong> has been submitted successfully.</p>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto space-y-5">
-        <div className="card">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(90,225,76,0.12)' }}>
-              <span className="text-xl">📋</span>
+  if (submitted) {
+    return (
+      <AppLayout>
+        <div className="min-h-[70vh] flex items-center justify-center p-4">
+          <div className="card max-w-md w-full text-center p-12">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: '#dcfce7' }}>
+              <span className="text-4xl">✅</span>
             </div>
-            <div>
-              <h1 className="page-title text-2xl">Submit Quotation</h1>
-              <p className="text-sm text-gray-500 font-inter">VendorBridge Procurement Platform</p>
-            </div>
+            <h2 className="font-fustat font-bold text-3xl text-gray-900 mb-2">
+              {isDraftMode ? 'Draft Saved!' : 'Submitted!'}
+            </h2>
+            <p className="text-gray-500 font-inter">
+              Your quotation for <strong>{rfq?.title}</strong> has been {isDraftMode ? 'saved as a draft' : 'submitted successfully'}.
+            </p>
+            <button onClick={() => navigate('/quotations')} className="btn-primary mt-6 mx-auto justify-center">
+              Go to Quotations
+            </button>
           </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const rfqSummary = rfq?.rfq_items
+    ? rfq.rfq_items.map(item => `${item.product_name} * ${item.quantity}`).join(', ') + ` - category ${rfq.category || ''}`
+    : '';
+
+  return (
+    <AppLayout>
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Title and RFQ Details */}
+        <div className="card space-y-4">
+          <div>
+            <h1 className="page-title text-3xl font-bold font-fustat text-gray-900 mb-1">Submit Quotations</h1>
+            <p className="text-base text-gray-600 font-inter font-medium">
+              RFQ: {rfq?.title || 'Loading...'} - deadline {rfq?.deadline || ''}
+            </p>
+          </div>
+
+          {/* RFQ Summary Banner */}
           {rfq && (
-            <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-gray-400 font-schibsted uppercase">RFQ</p>
-                <p className="text-sm font-semibold">{rfq.rfq_number}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 font-schibsted uppercase">Title</p>
-                <p className="text-sm font-semibold">{rfq.title}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 font-schibsted uppercase">Deadline</p>
-                <p className="text-sm font-semibold">{rfq.deadline}</p>
-              </div>
+            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200/80">
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">RFQ Summary</p>
+              <p className="text-sm font-semibold text-gray-800 font-inter">{rfqSummary}</p>
             </div>
           )}
         </div>
 
-        <div className="card space-y-5">
-          <h2 className="section-label">Quotation Terms</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Payment Terms *</label>
-              <input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} className="input" placeholder="Net 30 days" required />
-            </div>
-            <div>
-              <label className="label">Delivery Days *</label>
-              <input type="number" value={deliveryDays} onChange={e => setDeliveryDays(e.target.value)} className="input" placeholder="7" min="1" required />
-            </div>
-            <div>
-              <label className="label">Validity (Days)</label>
-              <input type="number" value={validityDays} onChange={e => setValidityDays(e.target.value)} className="input" placeholder="30" />
-            </div>
-            <div>
-              <label className="label">Tax Percentage</label>
-              <input type="number" value={taxPct} onChange={e => setTaxPct(Number(e.target.value))} className="input" placeholder="18" />
-            </div>
+        {/* Your Quotation Items Form */}
+        <div className="card space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="section-label text-xl font-bold font-fustat text-gray-900">Your Quotation</h2>
+            
+            {/* Vendor selection for non-vendors (officer, admin, manager) */}
+            {role !== 'vendor' && (
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-schibsted font-bold text-gray-500 uppercase tracking-wider shrink-0">Select Vendor *</span>
+                <select
+                  value={selectedVendorId}
+                  onChange={e => setSelectedVendorId(e.target.value)}
+                  className="input py-1.5 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl max-w-xs focus:ring-1 focus:ring-green-500"
+                  required
+                >
+                  <option value="">-- Choose Vendor --</option>
+                  {rfq?.rfq_vendors?.map(rv => rv.vendors && (
+                    <option key={rv.vendors.id} value={rv.vendors.id}>
+                      {rv.vendors.company_name} {rv.responded ? '(Responded)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
-          <div>
-            <label className="label">Notes / Comments</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="input resize-none" rows={3} placeholder="Any additional comments..." />
-          </div>
-        </div>
-
-        <div className="card">
-          <h2 className="section-label mb-4">Price Your Items</h2>
+          
           <div className="table-container">
             <table className="data-table">
               <thead>
-                <tr><th>#</th><th>Product</th><th>Req. Qty</th><th>Unit</th><th>Unit Price (₹) *</th><th>Total</th><th>Notes</th></tr>
+                <tr>
+                  <th>Item</th>
+                  <th className="text-center">Qty</th>
+                  <th>Unit price (₹) *</th>
+                  <th>Total</th>
+                  <th>Delivery (days) *</th>
+                </tr>
               </thead>
               <tbody>
-                {items.map((item, i) => (
-                  <tr key={i}>
-                    <td className="text-gray-400">{i + 1}</td>
-                    <td className="font-medium">{item.product_name}</td>
-                    <td className="font-noto">{item.quantity}</td>
-                    <td>{item.unit}</td>
-                    <td>
-                      <input
-                        type="number"
-                        value={item.unit_price}
-                        onChange={e => setItems(prev => prev.map((it, j) => j === i ? { ...it, unit_price: e.target.value } : it))}
-                        className="input py-1.5 w-28"
-                        placeholder="0.00"
-                        min="0"
-                        step="0.01"
-                      />
-                    </td>
-                    <td className="font-noto font-semibold">{formatCurrency(Number(item.unit_price || 0) * Number(item.quantity))}</td>
-                    <td>
-                      <input
-                        value={item.notes}
-                        onChange={e => setItems(prev => prev.map((it, j) => j === i ? { ...it, notes: e.target.value } : it))}
-                        className="input py-1.5"
-                        placeholder="Optional"
-                      />
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-8">
+                      <Loader2 className="animate-spin mx-auto text-green-500" size={24} />
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  items.map((item, i) => (
+                    <tr key={i}>
+                      <td className="font-semibold text-gray-800">{item.product_name}</td>
+                      <td className="text-center font-semibold text-gray-700">{item.quantity}</td>
+                      <td>
+                        <input
+                          type="number"
+                          value={item.unit_price}
+                          onChange={e => setItems(prev => prev.map((it, j) => j === i ? { ...it, unit_price: e.target.value } : it))}
+                          className="input py-2 w-36 font-semibold"
+                          placeholder="0.00"
+                          min="0"
+                          step="0.01"
+                          required
+                        />
+                      </td>
+                      <td className="font-semibold text-gray-800">
+                        {formatCurrency(Number(item.unit_price || 0) * Number(item.quantity))}
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          value={item.delivery_days}
+                          onChange={e => setItems(prev => prev.map((it, j) => j === i ? { ...it, delivery_days: e.target.value } : it))}
+                          className="input py-2 w-28 font-semibold"
+                          placeholder="7"
+                          min="1"
+                          required
+                        />
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
-          <div className="flex justify-end mt-5">
-            <div className="bg-gray-50 rounded-xl p-5 w-64 space-y-2">
-              <div className="flex justify-between text-sm font-inter">
-                <span className="text-gray-500">Subtotal:</span>
-                <span className="font-semibold">{formatCurrency(subtotal)}</span>
+          <div className="h-px bg-gray-200" />
+
+          {/* Bottom Forms & Calculations Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+            {/* Form Inputs */}
+            <div className="space-y-4">
+              <div>
+                <label className="label text-sm font-semibold text-gray-700">tax / GST %</label>
+                <input
+                  type="number"
+                  value={taxPct}
+                  onChange={e => setTaxPct(Number(e.target.value))}
+                  className="input py-2 w-full max-w-[200px] font-semibold"
+                  placeholder="18"
+                  min="0"
+                />
               </div>
-              <div className="flex justify-between text-sm font-inter">
-                <span className="text-gray-500">Tax ({taxPct}%):</span>
-                <span className="font-semibold">{formatCurrency(taxAmount)}</span>
+              <div>
+                <label className="label text-sm font-semibold text-gray-700">Note / terms</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className="input resize-none py-2.5 h-32 text-gray-700"
+                  placeholder="Payment terms: 20 days net..."
+                  rows={3}
+                />
               </div>
-              <div className="flex justify-between pt-2 border-t border-gray-200">
-                <span className="font-schibsted font-bold text-gray-900">Grand Total:</span>
-                <span className="font-fustat font-bold text-xl text-black">{formatCurrency(total)}</span>
+            </div>
+
+            {/* Totals Box */}
+            <div className="flex justify-end items-start">
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 w-full max-w-sm space-y-4">
+                <div className="flex justify-between text-sm text-gray-600 font-inter">
+                  <span>Subtotal</span>
+                  <span className="font-bold text-gray-800">{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-600 font-inter">
+                  <span>GST ({taxPct}%)</span>
+                  <span className="font-bold text-gray-800">{formatCurrency(taxAmount)}</span>
+                </div>
+                <div className="h-px bg-gray-200" />
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-800 font-bold font-schibsted text-base">Grand total</span>
+                  <span className="text-gray-900 text-2xl font-bold font-fustat">{formatCurrency(total)}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !paymentTerms || !deliveryDays}
-            className="btn-primary"
-          >
-            {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : null}
-            Submit Quotation
-          </button>
+          <div className="h-px bg-gray-200 my-6" />
+
+          {/* Buttons Action Group */}
+          <div className="flex justify-start gap-4">
+            <button
+              onClick={() => mutation.mutate('submitted')}
+              disabled={mutation.isPending || (role !== 'vendor' && !selectedVendorId) || items.some(i => !i.unit_price || !i.delivery_days)}
+              className="btn-primary"
+            >
+              {mutation.isPending && !isDraftMode ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
+              Submit Quotation
+            </button>
+            
+            <button
+              onClick={() => mutation.mutate('draft')}
+              disabled={mutation.isPending || (role !== 'vendor' && !selectedVendorId)}
+              className="px-6 py-2.5 rounded-xl border border-gray-300 font-schibsted font-semibold text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+            >
+              {mutation.isPending && isDraftMode ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
+              Save Draft
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }
