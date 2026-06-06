@@ -321,6 +321,46 @@ body {
 }
 
 /* ============================================================
+   LANDING PAGE
+   ============================================================ */
+.landing-video-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(14, 19, 17, 0.08) 0%, rgba(14, 19, 17, 0.72) 58%, #0e1311 100%),
+    radial-gradient(circle at 50% 30%, rgba(90, 225, 76, 0.10), transparent 42%),
+    rgba(0, 0, 0, 0.44);
+}
+
+.landing-dark-animation {
+  position: absolute;
+  inset: -18%;
+  background:
+    conic-gradient(from 210deg at 50% 50%, transparent 0deg, rgba(90, 225, 76, 0.10) 70deg, transparent 145deg, rgba(255, 255, 255, 0.05) 220deg, transparent 300deg),
+    radial-gradient(circle at 24% 72%, rgba(90, 225, 76, 0.13), transparent 30%),
+    radial-gradient(circle at 76% 36%, rgba(255, 255, 255, 0.06), transparent 28%);
+  filter: blur(26px);
+  opacity: 0.72;
+  animation: landing-drift 16s ease-in-out infinite alternate;
+  mix-blend-mode: screen;
+}
+
+@keyframes landing-drift {
+  0% {
+    transform: translate3d(-2%, -1%, 0) rotate(0deg) scale(1);
+  }
+  100% {
+    transform: translate3d(2%, 3%, 0) rotate(10deg) scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-dark-animation {
+    animation: none;
+  }
+}
+
+/* ============================================================
    MODAL / SHEET OVERLAY
    ============================================================ */
 .modal-overlay {

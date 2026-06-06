@@ -29,7 +29,8 @@ import Reports from './pages/Reports';
 import ActivityLogs from './pages/ActivityLogs';
 
 // Route guards
-import { ProtectedRoute, RoleRoute } from './routes/ProtectedRoute';
+import { ProtectedRoute } from './routes/ProtectedRoute';
+import LandingPage from './pages/LandingPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,12 +85,12 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/" element={<LandingPage />} />
 
           {/* Vendor: quotation submission (public with auth check inside) */}
           <Route path="/quotations/submit/:rfq_id" element={<QuotationSubmit />} />
 
           {/* Protected */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
           <Route path="/rfqs" element={<ProtectedRoute><RFQs /></ProtectedRoute>} />
